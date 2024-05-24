@@ -73,6 +73,7 @@ class Analysis:
         pd.set_option('display.float_format', '{:.2f}'.format)
         
         df = self._data(df, val)
+        df.replace("", np.nan, inplace=True)
         temp = df.describe(include="all").drop(["count", "unique"]).T.fillna("-")
         temp.insert(loc=0, column='Dtype', value=[df[f].dtype for f in df])
         temp.insert(loc=1, column='nunique', value=df.nunique())
@@ -155,12 +156,11 @@ class Analysis:
         correlation_matrix = df.corr(numeric_only=True)
         mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
         correlation_matrix = correlation_matrix.mask(mask)
-        fig = px.imshow(correlation_matrix,
+        return px.imshow(correlation_matrix,
                 labels=dict(color="Correlation"),
                 x=correlation_matrix.index,
                 y=correlation_matrix.columns,
                 color_continuous_scale='Viridis')
-        return fig.show()
     
     
     def pairplot(self, df:pd.DataFrame=None, 
@@ -186,6 +186,5 @@ class Analysis:
                                 color=target if target and df[target].nunique() < 20 else None, 
                                 opacity=0.5)
         fig.update_traces(showupperhalf=False, diagonal_visible=False)
-        fig.update_layout(title="Pairplot between high cardinality features and correlation with target",
-                         height=height, width=width)
-        return fig.show()
+        fig.update_layout(title="Pairplot between high cardinality features and correlation with target")
+        return fig
