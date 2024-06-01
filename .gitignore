@@ -1,2 +1,5 @@
 dcn.ipynb
 multitask.ipynb
+logs
+db.sqlite3
+recommender_model
