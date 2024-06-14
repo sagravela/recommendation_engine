@@ -3,3 +3,5 @@ multitask.ipynb
 logs
 db.sqlite3
 recommender_model
+clicks_ds
+products_ds
