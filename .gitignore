@@ -2,4 +2,4 @@ multitask.ipynb
 recommender_model
 logs
 db.sqlite3
-__pycache__
+__pycache__/
