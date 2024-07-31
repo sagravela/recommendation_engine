@@ -105,10 +105,10 @@ class Analysis:
         return px.histogram(data_frame=df, x=feature, title='Target Distribution')
     
     
-    def plot_distributions(self, df:pd.DataFrame=None, columns_to_drop:list=[], target:str=None, val:bool=False):
+    def plot_distributions(self, df: pd.DataFrame = None, columns_to_drop: list = [], target: str = None, val: bool = False):
         """
         Displays the distribution of the features in the dataset.
-        
+
         Parameters:
             df (pd.DataFrame, optional): The input DataFrame. Default is `train` DataFrame.
             columns_to_drop (list, optional): The list of columns to drop. Default is an empty list.
@@ -120,23 +120,29 @@ class Analysis:
         df = self._data(df, val)
         if target is None:
             target = self.target
-            
-        features = df.columns.drop(columns_to_drop)
-        rows = len(features)//3 if len(features)%3 == 0 else len(features)//3+1
 
-        fig, axes = plt.subplots(rows, 3, figsize=(15,20))
+        features = df.columns.drop(columns_to_drop)
+        rows = len(features) // 3 if len(features) % 3 == 0 else len(features) // 3 + 1
+
+        fig, axes = plt.subplots(rows, 3, figsize=(15, 20))
         for i, feature in enumerate(features):
-            ax = axes.ravel()[i]            
-            sns.histplot(df, 
-                         x=feature, 
-                         hue=target if target and df[target].nunique() < 20 else None, 
-                         multiple="stack", 
-                         ax=ax, bins=50, 
-                         kde=True if df[feature].dtype not in ['O','category'] else False)
+            ax = axes.ravel()[i]
+            sns.histplot(df,
+                         x=feature,
+                         hue=target if target and df[target].nunique() < 20 else None,
+                         multiple="stack",
+                         ax=ax, bins=50,
+                         kde=True if df[feature].dtype not in ['O', 'category'] else False)
+            
             ax.set_ylabel("")
             ax.set_title(f"{feature} distribution")
+
+            for tick in ax.get_xticklabels():
+                tick.set_rotation(45)
+                tick.set_ha('right')
+
         plt.tight_layout()
-        return plt.show()
+        plt.show()
     
     
     def correlation(self, df:pd.DataFrame=None, columns_to_drop:list=[], val:bool=False):
