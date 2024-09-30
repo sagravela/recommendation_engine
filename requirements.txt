@@ -4,7 +4,8 @@ seaborn
 matplotlib
 plotly
 wordcloud
-tensorflow==2.15.1
+tensorflow[and-cuda]==2.15.1
 tensorflow-recommenders==0.7.3
 tensorboard
 optuna
+ImbalancedLearningRegression

@@ -1,5 +1,11 @@
-multitask.ipynb
-recommender_model
-logs
+/__pycache__
+/.venv
+/recommendation_model
+/logs
+/data/clicks
+/data/products
+
+*.log
+*.png
+test_logs
 db.sqlite3
-__pycache__/

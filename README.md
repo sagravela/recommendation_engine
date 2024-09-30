@@ -1,13 +1,15 @@
-# Recommendation Engine with Tensorflow Recommenders
+# E-commerce Recommendation Engine
 
-This project implements a recommendation system using TensorFlow Recommenders (TFRS). The system is designed to provide personalized product recommendations based on user interactions such as searches, clicks, add-to-cart actions, and purchases. The dataset used consists of user interaction data from an e-commerce platform.  
+This project demonstrates the end-to-end implementation of a deep learning-based recommendation system using TensorFlow Recommenders (TFRS). The system is designed to deliver personalized product recommendations by analyzing user interactions such as searches, clicks, add-to-cart actions, and purchases. It leverages a dataset of user interaction data sourced from an e-commerce platform and applies advanced deep learning techniques to model user preferences. This approach enhances the shopping experience by providing highly relevant product suggestions tailored to individual users, making the recommendation system both accurate and scalable.
 
 ## Features
+- **Unified Model Architecture**: Integrates the entire recommendation system into a single cohesive model, including all necessary preprocessing layers.
+- **Advanced Embeddings**: Utilizes embeddings for both users and items to capture and leverage latent features, enhancing recommendation precision.
+- **Deep Neural Network**: Employs a multi-layered deep neural network on top of embeddings to model complex user-item interactions and improve recommendation quality.
+- **Multi-Task Learning Capabilities**: Supports various tasks, including retrieval and ranking, within the same framework to streamline performance.
+- **Efficient Retrieval**: Optimizes the retrieval process to quickly identify and suggest the most relevant products for user queries.
+- **Enhanced Ranking**: Refines the ordering of recommended products based on user preferences and contextual relevance.
+- **Flexible and Extensible**: Designed to be easily adaptable with additional features and interactions to suit diverse use cases.
 
-- **User Interaction Data**: Utilizes various user interactions including searches, clicks, add-to-cart actions, and purchases to generate recommendations.
-- **TensorFlow Recommenders**: Leverages TFRS to build, train, and evaluate the recommendation models.
-- **Embeddings**: Uses embeddings for users and items to capture latent features and improve recommendation accuracy.
-- **Query Search**: Allows recommendations based on product search queries, product names, categories, and characteristics.
-- **Retrieval Model**: Focuses on efficient retrieval of the most relevant products for a given user query.
-- **Ranking Ordering**: Optimizes the ranking of recommended products based on user preferences and relevance.
-- **Customizable**: Easy to extend with additional features and interactions.
+## Get Started
+Try out the demo on [Hugging Face Space](https://huggingface.co/spaces/sagravela/demo_recommendation_engine).
