@@ -1,0 +1,268 @@
+digraph G {
+    rankdir=TB;
+    splines=ortho;
+    nodesep=0.3; // Increases space between nodes
+    ranksep=0.2; // Increases space between levels
+    
+    
+    // Global Node style
+    node [shape=box style="rounded,filled" color="#4682B4" fillcolor="#ADD8E6" fontname="Helvetica" fontsize=12];
+
+    // Input Features Cluster
+    subgraph cluster_input {
+        label="     Input Features";
+        style=filled;
+        color="#FFCC99";
+        fontname="Consolas";
+        fontsize=20;
+        labeljust="l";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];    
+        
+        // Nodes
+        user_features [
+            label=<
+                <table border="0" cellborder="0" cellspacing="0" cellpadding="2">
+                    <tr><td><b>User Features</b></td></tr>
+                    <tr><td align="left">&#8226; <i>user_id</i></td></tr>
+                    <tr><td align="left">&#8226; <i>channel</i></td></tr>
+                    <tr><td align="left">&#8226; <i>device_type</i></td></tr>
+                    <tr><td align="left">&#8226; <i>query_text</i></td></tr>
+                    <tr><td align="left">&#8226; <i>time</i></td></tr>
+                </table>
+            > 
+            shape=box style=filled
+        ];
+        
+        product_features [
+            label=<
+                <table border="0" cellborder="0" cellspacing="0" cellpadding="2">
+                    <tr><td><b>Product Features</b></td></tr>
+                    <tr><td align="left">&#8226; <i>product_id</i></td></tr>
+                    <tr><td align="left">&#8226; <i>category_name</i></td></tr>
+                    <tr><td align="left">&#8226; <i>merchant_name</i></td></tr>
+                    <tr><td align="left">&#8226; <i>merchant_city</i></td></tr>
+                    <tr><td align="left">&#8226; <i>merchant_state</i></td></tr>
+                    <tr><td align="left">&#8226; <i>merchant_region</i></td></tr>
+                    <tr><td align="left">&#8226; <i>free_shipping</i></td></tr>
+                    <tr><td align="left">&#8226; <i>is_sold_out</i></td></tr>
+                    <tr><td align="left">&#8226; <i>editor_pick</i></td></tr>
+                    <tr><td align="left">&#8226; <i>on_sale</i></td></tr>
+                    <tr><td align="left">&#8226; <i>product_name</i></td></tr>
+                    <tr><td align="left">&#8226; <i>sales_last_week</i></td></tr>
+                    <tr><td align="left">&#8226; <i>sales_last_month</i></td></tr>
+                    <tr><td align="left">&#8226; <i>sales_last_year</i></td></tr>
+                    <tr><td align="left">&#8226; <i>reviews</i></td></tr>
+                </table>
+            > 
+            shape=box style=filled
+        ];
+                
+        score [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td><b>Target Features</b></td></tr>
+                <tr><td align="left">&#8226; <i>score</i></td></tr>
+            </table>
+        >];
+
+    }
+
+    // Embedding Layer Cluster
+    subgraph cluster_preprocessing {
+        label="     Preprocessing";
+        margin=20;
+        style=filled;
+        color="#E0E0E0";
+        fontname="Consolas";
+        fontsize=20;
+        labeljust="l";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
+        
+        str_input [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td align="center"><b>Categorical</b></td></tr>
+                <tr><td align="left">&#8226; <i>user_id</i></td></tr>
+                <tr><td align="left">&#8226; <i>channel</i></td></tr>
+                <tr><td align="left">&#8226; <i>device_type</i></td></tr>
+                <tr><td align="left">&#8226; <i>product_id</i></td></tr>
+                <tr><td align="left">&#8226; <i>category_name</i></td></tr>
+                <tr><td align="left">&#8226; <i>merchant_name</i></td></tr>
+                <tr><td align="left">&#8226; <i>merchant_city</i></td></tr>
+                <tr><td align="left">&#8226; <i>merchant_state</i></td></tr>
+                <tr><td align="left">&#8226; <i>merchant_region</i></td></tr>
+            </table>
+        >]
+        int_input [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td align="center"><b>Integer</b></td></tr>
+                <tr><td align="left">&#8226; <i>free_shipping</i></td></tr>
+                <tr><td align="left">&#8226; <i>is_sold_out</i></td></tr>
+                <tr><td align="left">&#8226; <i>editor_pick</i></td></tr>
+                <tr><td align="left">&#8226; <i>on_sale</i></td></tr>
+                <tr><td align="left">&#8226; <i>hour</i></td></tr>
+                <tr><td align="left">&#8226; <i>day_of_week</i></td></tr>
+            </table>
+        >]
+        text_input [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td align="center"><b>Text</b></td></tr>
+                <tr><td align="left">&#8226; <i>query_text</i></td></tr>
+                <tr><td align="left">&#8226; <i>product_name</i></td></tr>
+            </table>
+        >]
+        cont_input [label=<<b>Continuous</b>>]
+    
+        lambda_time [label=<<b>Extract Time Features</b><br/>(Lambda Layer)<br/><b> day_of_week </b> and <b> hour </b> features added.>]
+        str [label=<StringLookup>]
+        int [label="IntegerLookup"]
+        text [label="TextVectorization"]
+        lambda_null [label=<Replace Nulls<br/>(Lambda Layer)>]
+        disc [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td align="center">Discretization</td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_week</i></td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_month</i></td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_year</i></td></tr>
+                <tr><td align="left">&#8226; <i>reviews</i></td></tr>
+            </table>
+        >]
+        norm [label=<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr><td align="center">Normalization</td></tr>
+                <tr><td align="left">&#8226; <i>price_in_cents</i></td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_month</i></td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_year</i></td></tr>
+                <tr><td align="left">&#8226; <i>reviews</i></td></tr>
+            </table>
+        >]
+    }
+    
+    // Embedding Layer Cluster
+    subgraph cluster_embeddings {
+        label=" Embeddings";
+        margin=20;
+        style=filled;
+        color="#FFCCCC";
+        fontname="Consolas";
+        fontsize=20;
+        labeljust="r";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
+        
+        blank_space [style=invis; width=0.5]
+
+        norm_reshape [label="Reshape" shape=diamond style="filled" fillcolor="#FFB266"]
+        str_embedding [label="Embedding"];
+        int_embedding [label="Embedding"];
+        text_embedding [label="Embedding"];
+        disc_embedding [label="Embedding"];
+        text_average_pooling [label="GlobalAveragePooling1D"];
+        
+        embeddings_concat [label="Concat" shape=ellipse style="filled" fillcolor="#90EE90"];
+        { rank=same; blank_space; str_embedding }
+    }
+    
+    // Query Tower Cluster
+    subgraph cluster_query_tower {
+        label="Query\nTower";
+        margin=15;
+        style=filled;
+        color="#FFFFCC";
+        fontname="Consolas";
+        labeljust="r";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
+        
+        user_embedding [label="User Embedding"];
+        user_output [label="Dense Output Layer (32)"];
+    }
+    
+    // Product Tower Cluster
+    subgraph cluster_product_tower {
+        label="Product\nTower";
+        margin=15;
+        style=filled;
+        color="#FFCCE5";
+        fontname="Consolas";
+        labeljust="r";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
+        
+        product_embedding [label="Product Embedding"];
+        product_output [label="Dense Output Layer (32)"];
+    }
+    
+    // Rating Model Cluster
+    subgraph cluster_rating_tower {
+        label="Rating\nModel";
+        margin=5;
+        labeljust="r";
+        style=filled;
+        color="#CCCCFF";
+        fontname="Consolas";
+        node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
+
+        concat [label="Concat" shape=ellipse style="filled" fillcolor="#90EE90"];
+        rating_DL [label="Dense Layer (16)"]
+        rating_output [label="Dense Output Layer (1)"];
+    }
+    
+    retrieval_task [label="Retrieval Task" shape=ellipse style="filled" fillcolor="#F08080"];
+    rating_task [label="Rating Task" shape=ellipse style="filled" fillcolor="#F08080"];
+    
+    retrieval_loss [label="Retrieval Loss" shape=hexagon style="filled" fillcolor="#FFFF66"];
+    rating_loss [label="Rating Loss" shape=hexagon style="filled" fillcolor="#FFFF66"];
+
+    total_loss [label="Total Loss" shape=box style="filled" fillcolor="#FFFFE0"];
+    gradient_update [label="Gradient Update" shape=box style="filled" fillcolor="#E0FFFF"];
+    
+    // Define Ranks
+    { rank=same; retrieval_task; rating_task }
+    { rank=same; total_loss; gradient_update }
+
+    // Edges
+    edge [color="#4682B4" penwidth=2 fontname="Arial" fontsize=12];
+
+    user_features -> lambda_time;
+    product_features -> lambda_time;
+
+    lambda_time -> {str_input;int_input;text_input;cont_input} [dir=none];
+
+    str_input -> str;
+    int_input -> int;
+    text_input -> lambda_null;
+    lambda_null -> text;
+    cont_input -> {norm;disc};
+    
+    str -> str_embedding;
+    int -> int_embedding;
+    text -> text_embedding;
+    disc -> disc_embedding;
+    norm -> norm_reshape;
+
+    text_embedding -> text_average_pooling;
+
+    {str_embedding;int_embedding;disc_embedding;norm_reshape;text_average_pooling} -> embeddings_concat [arrowhead=none];
+    
+    blank_space -> concat [style=invis]
+
+    embeddings_concat -> user_embedding;
+    embeddings_concat -> product_embedding;
+
+    user_embedding -> user_output [label="  (64, 570)"];
+    product_embedding -> product_output [xlabel="(64, 1271)  "];
+    user_embedding -> concat [xlabel="(64, 570)"];
+    product_embedding -> concat [label="  (64, 1271)"];
+    
+    concat -> rating_DL [label="(64, 1841)"];
+    
+    user_output -> retrieval_task [label="  (64, 32)"];
+    product_output -> retrieval_task [xlabel="(64, 32)  "];
+    rating_DL -> rating_output [label="(64, 16)"];
+    
+    retrieval_task -> retrieval_loss;
+    rating_output -> rating_task [label="  (64, 1)"];
+    
+    score -> rating_task;
+    retrieval_loss -> total_loss;
+    rating_task -> rating_loss;
+    rating_loss -> total_loss;
+    
+    total_loss -> gradient_update;
+}
