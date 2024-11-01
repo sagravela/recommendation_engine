@@ -4,6 +4,7 @@
 /logs
 /data/clicks
 /data/products
+/demo*
 
 *.log
 *.png
