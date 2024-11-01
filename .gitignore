@@ -1,11 +1,10 @@
 /__pycache__
 /.venv
 /recommendation_model
-logs*/
+/logs*
 /data/clicks
 /data/products
-/demo*
+demo*/
 
 *.log
 *.png
-test_logs
