@@ -40,7 +40,6 @@ digraph G {
                     <tr><td align="left">&#8226; <i>product_id</i></td></tr>
                     <tr><td align="left">&#8226; <i>category_name</i></td></tr>
                     <tr><td align="left">&#8226; <i>merchant_name</i></td></tr>
-                    <tr><td align="left">&#8226; <i>merchant_city</i></td></tr>
                     <tr><td align="left">&#8226; <i>merchant_state</i></td></tr>
                     <tr><td align="left">&#8226; <i>merchant_region</i></td></tr>
                     <tr><td align="left">&#8226; <i>free_shipping</i></td></tr>
@@ -86,7 +85,6 @@ digraph G {
                 <tr><td align="left">&#8226; <i>product_id</i></td></tr>
                 <tr><td align="left">&#8226; <i>category_name</i></td></tr>
                 <tr><td align="left">&#8226; <i>merchant_name</i></td></tr>
-                <tr><td align="left">&#8226; <i>merchant_city</i></td></tr>
                 <tr><td align="left">&#8226; <i>merchant_state</i></td></tr>
                 <tr><td align="left">&#8226; <i>merchant_region</i></td></tr>
             </table>
@@ -122,15 +120,14 @@ digraph G {
                 <tr><td align="left">&#8226; <i>sales_last_week</i></td></tr>
                 <tr><td align="left">&#8226; <i>sales_last_month</i></td></tr>
                 <tr><td align="left">&#8226; <i>sales_last_year</i></td></tr>
+                <tr><td align="left">&#8226; <i>price_in_cents</i></td></tr>
                 <tr><td align="left">&#8226; <i>reviews</i></td></tr>
             </table>
         >]
         norm [label=<
             <table border="0" cellborder="0" cellspacing="0">
                 <tr><td align="center">Normalization</td></tr>
-                <tr><td align="left">&#8226; <i>price_in_cents</i></td></tr>
-                <tr><td align="left">&#8226; <i>sales_last_month</i></td></tr>
-                <tr><td align="left">&#8226; <i>sales_last_year</i></td></tr>
+                <tr><td align="left">&#8226; <i>sales_last_week</i></td></tr>
                 <tr><td align="left">&#8226; <i>reviews</i></td></tr>
             </table>
         >]

@@ -1,9 +1,4 @@
 /__pycache__
-/.venv
-/recommendation_model
-/logs*
-/data/clicks
+/model
+/logs
 /data/products
-
-*.log
-*.png
