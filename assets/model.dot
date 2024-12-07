@@ -196,7 +196,8 @@ digraph G {
         node [style="rounded,filled", fillcolor="#ADD8E6", color="#4682B4"];
 
         concat [label="Concat" shape=ellipse style="filled" fillcolor="#90EE90"];
-        rating_DL [label="Dense Layer (16)"]
+        rating_DL0 [label="Dense Layer (32)"]
+        rating_DL1 [label="Dense Layer (64)"]
         rating_output [label="Dense Output Layer (1)"];
     }
     
@@ -242,16 +243,17 @@ digraph G {
     embeddings_concat -> user_embedding;
     embeddings_concat -> product_embedding;
 
-    user_embedding -> user_output [label="  (64, 570)"];
-    product_embedding -> product_output [xlabel="(64, 1271)  "];
-    user_embedding -> concat [xlabel="(64, 570)"];
-    product_embedding -> concat [label="  (64, 1271)"];
+    user_embedding -> user_output [xlabel="(64, 379)  "];
+    product_embedding -> product_output [xlabel="(64, 833)  "];
+    user_embedding -> concat [xlabel="     (64, 379)"];
+    product_embedding -> concat [label="  (64, 833)"];
     
-    concat -> rating_DL [label="(64, 1841)"];
+    concat -> rating_DL0 [label="(64, 1212)"];
+    rating_DL0 -> rating_DL1 [label="  (64, 32)"]
+    rating_DL1 -> rating_output [label="(64, 64)"]
     
     user_output -> retrieval_task [label="  (64, 32)"];
     product_output -> retrieval_task [xlabel="(64, 32)  "];
-    rating_DL -> rating_output [label="(64, 16)"];
     
     retrieval_task -> retrieval_loss;
     rating_output -> rating_task [label="  (64, 1)"];
