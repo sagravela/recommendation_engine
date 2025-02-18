@@ -1,6 +1,7 @@
 # E-commerce Recommendation Engine
 
-This project demonstrates the end-to-end implementation of a deep learning-based recommendation system using TensorFlow Recommenders (TFRS). The system is designed to deliver personalized product recommendations by analyzing user interactions such as searches, clicks, add-to-cart actions, and purchases. It leverages a dataset of user interaction data sourced from an e-commerce platform and applies advanced deep learning techniques to model user preferences. This approach enhances the shopping experience by providing highly relevant product suggestions tailored to individual users, making the recommendation system both accurate and scalable.
+This project demonstrates the end-to-end implementation of a deep learning-based recommendation system using TensorFlow Recommenders (TFRS). The system is designed to deliver personalized product recommendations by analyzing user interactions such as searches, clicks, add-to-cart actions, and purchases. It leverages a dataset of user interaction data sourced from an e-commerce platform and applies advanced deep learning techniques to model user preferences. This approach enhances the shopping experience by providing highly relevant product suggestions tailored to individual users, making the recommendation system both accurate and scalable.  
+![Recommendation System Demo](assets/recommendation_system.gif)  
 
 ## Features
 - **Unified Model Architecture**: Integrates the entire recommendation system into a single cohesive model, including all necessary preprocessing layers.
