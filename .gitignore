@@ -1,4 +1,3 @@
 /__pycache__
-/model
-/logs
-/data/products
+/data
+/output
