@@ -1,4 +1,3 @@
-import os
 import argparse
 import json
 from pathlib import Path
@@ -6,7 +5,11 @@ from pathlib import Path
 import tensorflow as tf
 import optuna
 
-from train_functions import train_model
+from .train_functions import train_model
+
+# Resolve root path
+ROOT_PATH = Path().resolve().parent
+STUDY_PATH = ROOT_PATH / "output" / "logs" / "hp.log"
 
 # Hyperparameter Tuning
 ## Objective Function
@@ -41,7 +44,7 @@ class Objective:
 
         layers = []
         for l in range(deep_layers):
-            layers.append(trial.suggest_categorical(f'rating_units_l{l}', units))
+            layers.append(trial.suggest_categorical(f"rating_units_l{l}", units))
         # Add 1 unit in output layer by regression
         layers.append(1)
         return layers
@@ -51,16 +54,16 @@ class Objective:
         tf.keras.backend.clear_session()
 
         # Define parameters and suggest values to be tuned and optimized
-        params['logs_path'] = Path("output") / "logs" / "optuna" / "run_{:02d}".format(trial.number)
-        params['model']['learning_rate']['initial_learning_rate'] = trial.suggest_categorical('initial_learning_rate', [0.1, 0.01])
-        params['model']['emb_weight'] = trial.suggest_int('emb_weight', 4, 16, step=4)
-        output_layer = trial.suggest_categorical('output_layer', [8, 16, 32, 64])
-        params['model']['user_layers'] = [output_layer]
-        params['model']['product_layers'] = [output_layer]
-        params['model']['rating_layers'] = self.deep_layers(trial, [8, 16, 32, 64, 128, 256])
-        params['model']['dropout'] = trial.suggest_float('dropout', 0.0, 0.5, step=0.1)
-        params['model']['cross_layer'] = trial.suggest_categorical('cross_layer', [True, False])
-        params['model']['optimizer'] = trial.suggest_categorical('optimizer', ['Adagrad', 'Adam'])
+        params["logs_path"] = Path("output") / "logs" / "optuna" / "run_{:02d}".format(trial.number)
+        params["model"]["learning_rate"]["initial_learning_rate"] = trial.suggest_categorical("initial_learning_rate", [0.1, 0.01])
+        params["model"]["emb_weight"] = trial.suggest_int("emb_weight", 4, 16, step=4)
+        output_layer = trial.suggest_categorical("output_layer", [8, 16, 32, 64])
+        params["model"]["user_layers"] = [output_layer]
+        params["model"]["product_layers"] = [output_layer]
+        params["model"]["rating_layers"] = self.deep_layers(trial, [8, 16, 32, 64, 128, 256])
+        params["model"]["dropout"] = trial.suggest_float("dropout", 0.0, 0.5, step=0.1)
+        params["model"]["cross_layer"] = trial.suggest_categorical("cross_layer", [True, False])
+        params["model"]["optimizer"] = trial.suggest_categorical("optimizer", ["Adagrad", "Adam"])
 
         model = train_model(
             candidates = self.candidates,
@@ -72,7 +75,7 @@ class Objective:
         )
 
         # Get metrics
-        trial_results = {m: v[-1] for m, v in model.history.history.items() if m.startswith('val')}
+        trial_results = {m: v[-1] for m, v in model.history.history.items() if m.startswith("val")}
 
         # Save metrics as attributes for further analysis
         for m, v in trial_results.items():
@@ -80,19 +83,16 @@ class Objective:
 
         # Return the objective values
         return (
-            trial_results['val_factorized_top_k/top_50_categorical_accuracy'],
-            trial_results['val_root_mean_squared_error']
+            trial_results["val_factorized_top_k/top_50_categorical_accuracy"],
+            trial_results["val_root_mean_squared_error"]
         )
 
 if __name__=="__main__":
-    # Resolve root path
-    root_path = Path().resolve().parent
-
     # Load data
-    params = json.loads(open(root_path / "output" / "model" / "parameters" / "params_v2.json"))
-    prep_clicks_train_sh = tf.data.Dataset.load(root_path / "data" / "processed" / "prep_train")
-    prep_clicks_val_sh = tf.data.Dataset.load(root_path / "data" / "processed" / "prep_val")
-    products_ds = tf.data.Dataset.load(root_path / "data" / "processed" / "candidates")
+    params = json.loads(open(ROOT_PATH / "output" / "model" / "parameters" / "params_v2.json").read())
+    prep_clicks_train_sh = tf.data.Dataset.load(ROOT_PATH / "data" / "processed" / "prep_train")
+    prep_clicks_val_sh = tf.data.Dataset.load(ROOT_PATH / "data" / "processed" / "prep_val")
+    products_ds = tf.data.Dataset.load(ROOT_PATH / "data" / "processed" / "candidates")
 
     parser = argparse.ArgumentParser(
         description="Hyperparameter tuning for recommendation engine."
@@ -104,14 +104,14 @@ if __name__=="__main__":
 
     # Load storage
     storage = optuna.storages.JournalStorage(
-        optuna.storages.JournalFileStorage("hp.log"),
+        optuna.storages.JournalFileStorage(STUDY_PATH),
     )
 
     # Create a study
     study = optuna.create_study(
         storage=storage,
         study_name="recommendation_engine",
-        directions=['maximize', 'minimize'],
+        directions=["maximize", "minimize"],
         load_if_exists=True
     )
 

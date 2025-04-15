@@ -1,10 +1,9 @@
-from pathlib import Path
-
 import tensorflow as tf
 import pandas as pd
 import numpy as np
 
-from .utils import log
+from .data_cleaning import prepare_data
+from . import PROCESSED_PATH, log
 
 def get_products_df(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -16,13 +15,13 @@ def get_products_df(df: pd.DataFrame) -> pd.DataFrame:
     """
     products_df = df.groupby(["product_id", "merchant_name"]).last().reset_index() # Retain only last product
 
-    # Items dataset doesn't need time feature anymore
+    # Items dataset doesn"t need time feature anymore
     return products_df.drop("time", axis=1)
 
 def get_clicks_df(
         df: pd.DataFrame,
         products_df: pd.DataFrame,
-        add_to_cart_score: float= 0.5, 
+        add_to_cart_score: float= 0.5,
         conversion_score: float = 1.0
     ) -> pd.DataFrame:
     """
@@ -37,15 +36,15 @@ def get_clicks_df(
     |`1.0`|No/Yes|Yes|
     """
     # Create score feature
-    df = df[df['click'] == True].reset_index(drop=True)
-    df['score'] = np.where(df['conversion'] == True, conversion_score, np.where(df['add_to_cart'] == True, add_to_cart_score, 0.0))
-    
+    df = df[df["click"] == True].reset_index(drop=True)
+    df["score"] = np.where(df["conversion"] == True, conversion_score, np.where(df["add_to_cart"] == True, add_to_cart_score, 0.0))
+
     # Convert `time` to string given that TensorFlow does not support `datetime64` data type.
-    df['time'] = df['time'].astype(str)
+    df["time"] = df["time"].astype(str)
 
     # modify clicks dataset with the new values of product_name and category_name
-    merged = df.merge(products_df, on = ['product_id', 'merchant_name'])
-    df[['product_name', 'category_name']] = merged[['product_name_y', 'category_name_y']]
+    merged = df.merge(products_df, on = ["product_id", "merchant_name"])
+    df[["product_name", "category_name"]] = merged[["product_name_y", "category_name_y"]]
 
     return df
 
@@ -56,7 +55,7 @@ def create_cumulative_list(items: pd.Series) -> list:
     for item in items:
         result.append(cumulative_list.copy())
         cumulative_list.append(item)
-    
+
     return result
 
 # Function to create sequences
@@ -67,7 +66,7 @@ def create_feature_sequence(tbl: pd.DataFrame, feature: str, fix_len: int = 5) -
     """
     name = f"seq_{feature}"
     # Sort values by user_id and time and create list of value for each user
-    tbl[name] = tbl.sort_values(by=['user_id', 'time']).groupby('user_id')[feature].transform(create_cumulative_list)
+    tbl[name] = tbl.sort_values(by=["user_id", "time"]).groupby("user_id")[feature].transform(create_cumulative_list)
     # Pad sequences with zeros
     tbl[name] = tbl[name].apply(lambda x: (x + [0] * fix_len)[:fix_len])
     # Cast to string
@@ -78,30 +77,30 @@ def create_feature_sequence(tbl: pd.DataFrame, feature: str, fix_len: int = 5) -
 def create_dataset(data_df: pd.DataFrame, features: list) -> tf.data.Dataset:
     # Convert pandas dataframe to tensorflow dataset
     data_dict = {}
-    # Sequential features has to be handled differently
+    # Only keep the features we want to use
     for f in features:
-        f = f.split('-')[1] if '-' in f else f
-        data_dict[f] = tf.constant(data_df[f].to_list(), dtype=tf.string) if f.startswith('seq_') else data_df[f]
+        f = f.split("-")[1] if "-" in f else f
+        # Ignore if feature is not in the dataframe or if it is already in the dictionary
+        if f not in data_df.columns or f in data_dict.keys():
+            continue
+        # Sequential features has to be handled differently
+        data_dict[f] = tf.constant(data_df[f].to_list(), dtype=tf.string) if f.startswith("seq_") else data_df[f]
     return tf.data.Dataset.from_tensor_slices(data_dict)
 
-if __name__=="__main__":
-    processed_path = Path("data") / "processed"
+def process_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Load data
-    data_path = processed_path / "search_sample_data.parquet"
-    data_df = pd.read_parquet(data_path)
-    log.info("Data loaded: /%s", data_path)
+    data_path = PROCESSED_PATH / "search_sample_data.parquet"
+    if not data_path.exists():
+        data_df = prepare_data()
+    else:
+        data_df = pd.read_parquet(data_path)
+    log.info("Data loaded: %s", data_path)
     # Get products dataframe
     products_df = get_products_df(data_df)
     # Get clicks dataset
     clicks_df = get_clicks_df(data_df, products_df)
     # Create sequential features
-    clicks_df = create_feature_sequence(clicks_df, 'product_id')
-    clicks_df = create_feature_sequence(clicks_df, 'category_name')
+    clicks_df = create_feature_sequence(clicks_df, "product_id")
+    clicks_df = create_feature_sequence(clicks_df, "category_name")
     log.info("Dataframes processed.")
-
-    # Save dataframes
-    products_df_path = processed_path / "products_df.parquet"
-    clicks_df_path = processed_path / "clicks_df.parquet"
-    products_df.to_parquet(products_df_path)
-    clicks_df.to_parquet(clicks_df_path)
-    log.info("Dataframes saved to /%s and /%s", products_df_path, clicks_df_path)
+    return clicks_df, products_df

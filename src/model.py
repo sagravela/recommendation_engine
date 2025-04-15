@@ -4,6 +4,7 @@ import tensorflow as tf
 import tensorflow_recommenders as tfrs
 import numpy as np
 
+from .preprocessing import Preprocessing
 
 ## Embedding Layer
 @tf.keras.saving.register_keras_serializable(package="RecommendationEngine", name="EmbeddingsLayer")
@@ -26,15 +27,15 @@ class Embeddings(tf.keras.layers.Layer):
         self.params = params
         self.feature_dim = feature_dim
 
-        l_name = name.replace("Embeddings", "").lower()
-        self.features = params['tower'][l_name.upper()]
-        self.emb_weight = params['model'].get('emb_weight', 1)
+        self.l_name = name.replace("Embeddings", "").lower()
+        self.features = params["tower"][self.l_name]
+        self.emb_weight = params["model"].get("emb_weight", 1)
 
         self.embeddings = {}
         self.output_dim = 0
 
         for feature in self.features:
-            if '-' not in feature:
+            if "-" not in feature:
                 continue
 
             prep, feat = feature.split("-")
@@ -68,7 +69,7 @@ class Embeddings(tf.keras.layers.Layer):
         ----------
         feature : str
             Name of the feature
-        feature_dim : int
+        feature_dim : dict
             Input dimension of the embedding layer
 
         Returns
@@ -82,7 +83,7 @@ class Embeddings(tf.keras.layers.Layer):
         return emb_dim, tf.keras.layers.Embedding(feature_dim + 1, emb_dim, name=f"emb_{feature}", mask_zero=feature.split("-")[0] == "text")
 
     def call(self, input: dict[str, tf.Tensor]):
-        # Add normalized features as they are because they don't need embeddings. Only reshape is needed.
+        # Add normalized features as they are because they don"t need embeddings. Only reshape is needed.
         normalized_features = [tf.reshape(input[f"norm-clip_{f.split('-')[1]}"], (-1, 1)) for f in self.features if f.split("-")[0] == "norm"]
         # Concat embeddings and normalized features
         return tf.concat([self.embeddings[feature](input[feature]) for feature in self.embeddings.keys()] + normalized_features, axis=1)
@@ -91,7 +92,7 @@ class Embeddings(tf.keras.layers.Layer):
         # Method needed for serialization and saving
         config = super().get_config()
         config.update({
-            'params': self.params
+            "params": self.params
         })
         return config
 
@@ -116,25 +117,25 @@ class DeepLayers(tf.keras.Model):
         super().__init__(name= name)
 
         self.model_params = model_params
-        l_name = re.sub(r"Tower|Model", "", name).lower()
-        deep_layers = model_params[f"{l_name}_layers"]
-        model = tf.keras.Sequential(name=f"{l_name}_deep_layers")
+        self.l_name = re.sub("Model", "", name).lower()
+        self.deep_layers = model_params[f"{self.l_name}_layers"]
+        self.model = tf.keras.Sequential(name=f"{self.l_name}_deep_layers")
 
         if model_params["cross_layer"]:
             # Note that projection_dim needs to be smaller than (input size)/2 to reduce the cost.
-            # In practice, it've been observed using low-rank DCN with rank (input size)/4 consistently preserved the accuracy of a full-rank DCN.
-            model.add(tfrs.layers.dcn.Cross(projection_dim=input_dim // 4, kernel_initializer="glorot_uniform", name=f"cross_{l_name}"))
+            # In practice, it"ve been observed using low-rank DCN with rank (input size)/4 consistently preserved the accuracy of a full-rank DCN.
+            self.model.add(tfrs.layers.dcn.Cross(projection_dim=input_dim // 4, kernel_initializer="glorot_uniform", name=f"cross_{self.l_name}"))
 
         # Use the ReLU activation for all but the last layer.
-        for i, layer_size in enumerate(deep_layers[:-1]):
-            model.add(tf.keras.layers.Dense(layer_size, activation="relu", name=f"{l_name}_layer{i:02d}"))
+        for i, layer_size in enumerate(self.deep_layers[:-1]):
+            self.model.add(tf.keras.layers.Dense(layer_size, activation="relu", name=f"{self.l_name}_layer{i:02d}"))
 
             # Add dropout layer for regularization after each layer except between the last two layers
             if i != len(self.deep_layers) - 1:
-                model.add(tf.keras.layers.Dropout(model_params["dropout"], name=f"{l_name}_dropout{i:02d}"))
+                self.model.add(tf.keras.layers.Dropout(model_params["dropout"], name=f"{self.l_name}_dropout{i:02d}"))
 
         # No activation for the output layer.
-        model.add(tf.keras.layers.Dense(deep_layers[-1], name=f"{l_name}_output_layer"))
+        self.model.add(tf.keras.layers.Dense(self.deep_layers[-1], name=f"{self.l_name}_output_layer"))
 
     def call(self, input: tf.Tensor):
         return self.model(input)
@@ -143,7 +144,7 @@ class DeepLayers(tf.keras.Model):
         # Method needed for serialization and saving
         config = super().get_config()
         config.update({
-            'model_params': self.model_params
+            "model_params": self.model_params
         })
         return config
 
@@ -153,14 +154,16 @@ class RecommenderEngineModel(tfrs.models.Model):
     def __init__(
             self,
             params: dict,
-            candidates: tf.data.Dataset,
-            feature_dim: dict,
+            query_ds: tf.data.Dataset = None,
+            candidates_ds: tf.data.Dataset = None,
+            preprocessing: bool = True,
+            feature_dim: dict = None,
             train_metrics: bool = False
         ):
         """
         A custom recommendation model built on top of TensorFlow Recommenders (TFRS) framework.
-        This model implements a dual-tower architecture for learning user (query) and product (candidate) embeddings.
-        It supports both retrieval (matching users to products) and ranking tasks (predicting user ratings for products).
+        This model implements a dual-tower architecture for learning query and candidate embeddings.
+        It supports both retrieval (matching querys to items) and ranking tasks (predicting query ratings for items).
         Optionally, it handles input feature preprocessing, which is disabled during the experimentation workflow and enabled during serving.
         -  `prep_layer` only needed with preprocessing turned off.
         - `clicks` is only needed in preprocessing enabled.
@@ -178,72 +181,95 @@ class RecommenderEngineModel(tfrs.models.Model):
         super().__init__()
 
         self.params = params
+        self.preprocessing = preprocessing
+        self.feature_dim = feature_dim
         self.train_metrics = train_metrics
 
+        self.bs = 512
+
         # Input Deep Layers verification
-        assert params['model']['user_layers'][-1] == params['model']['product_layers'][-1], "User and Product output layers must have the same dimension"
-        assert params['model']['rating_layers'][-1] == 1, "Rating output layer must have 1 unit"
+        assert params["model"]["query_layers"][-1] == params["model"]["item_layers"][-1], "Query and Item output layers must have the same dimension"
+        assert params["model"]["rating_layers"][-1] == 1, "Rating output layer must have 1 unit"
+
+        # Preprocessing
+        if preprocessing:
+            self.query_prep_layer = Preprocessing("QueryPreprocessing", params["tower"]["query"], query_ds.batch(self.bs))
+            self.item_prep_layer = Preprocessing("ItemPreprocessing", params["tower"]["item"], candidates_ds.batch(self.bs))
+            self.feature_dim = {**self.query_prep_layer.feature_dim, **self.item_prep_layer.feature_dim}
+        else:
+            self.query_prep_layer = self.item_prep_layer = None
+
+            if self.feature_dim is None:
+                raise ValueError("feature_dim must be provided when preprocessing is disabled")
 
         # QUERY
-        self.user_embedding: tf.Tensor = Embeddings('UserEmbeddings', params, feature_dim)
-        self.user_model = DeepLayers('UserTower', params['model'], self.user_embedding.output_dim)
+        self.query_embedding_layer: tf.Tensor = Embeddings("QueryEmbeddings", params, self.feature_dim)
+        self.query_model_layer = DeepLayers("QueryModel", params["model"], self.query_embedding_layer.output_dim)
 
-        # PRODUCT
-        self.product_embedding: tf.Tensor = Embeddings('ProductEmbeddings', params, feature_dim)
-        self.product_model = DeepLayers('ProductTower', params['model'], self.product_embedding.output_dim)
+        # CANDIDATE
+        self.item_embedding_layer: tf.Tensor = Embeddings("ItemEmbeddings", params, self.feature_dim)
+        self.item_model_layer = DeepLayers("ItemModel", params["model"], self.item_embedding_layer.output_dim)
 
         # RATING
         self.rating_model: tf.Tensor = DeepLayers(
-            'RatingModel',
-            params['model'],
-            self.user_embedding.output_dim + self.product_embedding.output_dim
+            "RatingModel",
+            params["model"],
+            self.query_embedding_layer.output_dim + self.item_embedding_layer.output_dim
         )
 
         # TASKS
         # Retrieval Task
         # Build the candidates model to be used as candidates.
-        self.candidates_model = tf.keras.Sequential(name="product_candidates")
-        self.candidates_model.add(self.product_embedding)
-        self.candidates_model.add(self.product_model)
+        self.candidate_model = tf.keras.Sequential(name="item_candidates")
+        if preprocessing:
+            self.candidate_model.add(self.item_prep_layer)
+        self.candidate_model.add(self.item_embedding_layer)
+        self.candidate_model.add(self.item_model_layer)
 
-        self.retrieval_task: tf.keras.layers.Layer = tfrs.tasks.Retrieval(
+        self.retrieval_task = tfrs.tasks.Retrieval(
             metrics=tfrs.metrics.FactorizedTopK(
-                # candidates here is the preprocessed version of products
-                candidates.batch(512).cache().prefetch(tf.data.AUTOTUNE).map(self.candidates_model, num_parallel_calls=tf.data.AUTOTUNE)
+                # candidates here is the preprocessed version of items
+                candidates_ds.batch(self.bs).cache().prefetch(tf.data.AUTOTUNE).map(self.candidate_model, num_parallel_calls=tf.data.AUTOTUNE)
             )
         )
 
         # Ranking Task
-        self.rating_task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
+        self.rating_task = tfrs.tasks.Ranking(
             loss=tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE),
             metrics=[tf.keras.metrics.RootMeanSquaredError()],
         )
 
     def call(self, input: dict[str, tf.Tensor]):
+        # Preprocess the input data
+        if self.preprocessing:
+            query_data = self.query_prep_layer(input)
+            item_data = self.item_prep_layer(input)
+            input = {**query_data, **item_data}
+
         # Get embeddings
-        user_embedding: tf.Tensor = self.user_embedding(input)
-        product_embedding: tf.Tensor = self.product_embedding(input)
+        query_embedding: tf.Tensor = self.query_embedding_layer(input)
+        item_embedding: tf.Tensor = self.item_embedding_layer(input)
 
         # Get model outputs
         return (
-            self.user_model(user_embedding),
-            self.product_model(product_embedding),
-            self.rating_model(tf.concat([user_embedding, product_embedding], axis=1))
+            self.query_model_layer(query_embedding),
+            self.item_model_layer(item_embedding),
+            self.rating_model(tf.concat([query_embedding, item_embedding], axis=1))
         )
 
     def compute_loss(self, input: dict[str, tf.Tensor], training=False):
-        ratings: tf.Tensor = input.pop("score")
+        score: tf.Tensor = input.pop("score")
 
-        user, product, rating = self(input)
+        query, item, preds = self(input)
 
         compute_metrics = True if self.train_metrics else not training
         # We compute the loss for each task.
         rating_loss = self.rating_task(
-            labels=ratings,
-            predictions=rating,
+            labels=score,
+            predictions=preds,
             compute_metrics=compute_metrics
         )
-        retrieval_loss = self.retrieval_task(user, product, compute_metrics=compute_metrics)
+        retrieval_loss = self.retrieval_task(query, item, compute_metrics=compute_metrics)
 
         # And sum up the losses
         return (rating_loss + retrieval_loss)
@@ -252,7 +278,7 @@ class RecommenderEngineModel(tfrs.models.Model):
         # Method needed for serialization and saving
         config = super().get_config()
         config.update({
-            'params': self.params,
-            'train_metrics': self.train_metrics
+            "params": self.params,
+            "train_metrics": self.train_metrics
         })
         return config

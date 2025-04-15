@@ -1,11 +1,12 @@
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 
 ## Preprocessing Layer
 @tf.function
 def replace_empty_string(x: tf.Tensor) -> tf.Tensor:
     """
-    Replace empty strings in a feature with '[NULL]'
+    Replace empty strings or whitespaces in a feature with "[NULL]"
 
     Parameters
     ----------
@@ -17,7 +18,7 @@ def replace_empty_string(x: tf.Tensor) -> tf.Tensor:
     tf.Tensor
         Processed feature
     """
-    return tf.where(tf.strings.regex_full_match(x, ""), tf.constant("[NULL]"), x)
+    return tf.where(tf.strings.regex_full_match(x, "\s*"), tf.constant("[NULL]"), x)
 
 @tf.function
 def extract_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
@@ -34,8 +35,8 @@ def extract_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
     dict[tf.Tensor]
         Dictionary of processed features
     """
-    # Extract the 'time' feature
-    times = x['time']
+    # Extract the "time" feature
+    times = x["time"]
 
     # Extract date and time parts using substr
     date_str = tf.strings.substr(times, 0, 10)
@@ -49,7 +50,7 @@ def extract_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
     # Extract hour
     hours = tf.strings.to_number(tf.strings.substr(time_str, 0, 2), tf.int32)
 
-    # Helper function to calculate day of week using Zeller's Congruence
+    # Helper function to calculate day of week using Zeller"s Congruence
     def zellers_congruence(year, month, day):
         if month < 3:
             month += 12
@@ -63,11 +64,12 @@ def extract_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
     day_of_week = tf.vectorized_map(lambda x: zellers_congruence(x[0], x[1], x[2]), (years, months, days))
 
     # Add the parsed components back to the dictionary
-    return {**x, 'hour': hours, 'day_of_week': day_of_week}
+    return {**x, "hour": hours, "day_of_week": day_of_week}
 
 @tf.function
-def feature_range(x: tf.Tensor) -> tuple[float, float]:
+def clip_cont_features(x: dict[tf.Tensor], features: list[str]) -> dict:
     """
+    Clip continuous features to their respective boundaries.
     The distribution of continuous features present skewness and outliers.
 
     To reduce the impact of outliers on the model, I decide to dentify and clip outliers in continuous features by the following equation:
@@ -80,26 +82,6 @@ def feature_range(x: tf.Tensor) -> tuple[float, float]:
     $$
     IQR = Q3 - Q1
     $$
-
-    I will get the allowed boundaries for each continuous feature in `BOUNDARIES` dictionary. Then, I will clip the outliers within the model.
-    """
-    # Calculate Q1 (25th percentile) and Q3 (75th percentile)
-    Q1 = np.quantile(x, 0.25)
-    Q3 = np.quantile(x, 0.75)
-
-    # Calculate IQR
-    IQR = Q3 - Q1
-
-    # Define outlier boundaries
-    lower_bound = Q1 - 3 * IQR
-    upper_bound = Q3 + 3 * IQR
-    # Ensure that the lower bound is equal or over the miminum value allowed
-    return (lower_bound if lower_bound >= np.min(x) else np.min(x), upper_bound)
-
-@tf.function
-def clip_cont_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
-    """
-    Clip continuous features to their respective boundaries.
 
     Parameters
     ----------
@@ -114,10 +96,14 @@ def clip_cont_features(x: dict[tf.Tensor]) -> dict[tf.Tensor]:
         Dictionary of clipped features
     """
     clipped_features = {}
-    features = set([f for f in x.keys() if f.startswith('disc-') or f.startswith('norm-')])
     for feature in features:
-        boundarie = feature_range(x[feature])
-        clipped_features[f"clip_{feature}"] = tf.clip_by_value(x[feature], boundarie[0], boundarie[1])
+        Q1 = tfp.stats.percentile(x[feature], 25.0, interpolation = "lower")
+        Q3 = tfp.stats.percentile(x[feature], 75.0, interpolation = "lower")
+        IQR = Q3 - Q1
+
+        lower_bound = tf.maximum(Q1 - 3 * IQR, tf.reduce_min(x[feature]))
+        upper_bound = Q3 + 3 * IQR
+        clipped_features[f"clip_{feature}"] = tf.clip_by_value(x[feature], lower_bound, upper_bound)
     # Add the generated clipped features to the input
     return {**x, **clipped_features}
 
@@ -144,30 +130,40 @@ class Preprocessing(tf.keras.layers.Layer):
 
         self.features = features
         self.prep_layers = {}
+        self.feature_dim = {}
 
         self.extract_time_features = None
         if "int-hour" in self.features or "int-day_of_week" in self.features:
             self.extract_time_features = tf.keras.layers.Lambda(extract_features, name= "extract_time_features")
 
-        self.clip_outliers = None
-        if any(f.startswith('disc-') or f.startswith('norm-') for f in self.features):
-            self.clip_outliers = tf.keras.layers.Lambda(clip_cont_features, name= "clip_outliers")
+        self.cont_features = list(set(f.split("-")[1] for f in self.features if f.startswith("norm-") or f.startswith("disc-")))
+        self.clip_outliers = tf.keras.layers.Lambda(clip_cont_features, name= "clip_outliers", arguments = {"features": self.cont_features})
+
+        # Clip outliers to adapt the corresponding layers
+        if self.cont_features:
+            clip_ds = ds.map(lambda x: clip_cont_features(x, self.cont_features))
 
         for feature in self.features:
-            if '-' not in feature:
+            if not "-" in feature:
                 continue
 
             prep, feat = feature.split("-")
             if prep in ["cat", "seq"]:
-                self.prep_layers[feature] = tf.keras.layers.StringLookup(name=feature).adapt(ds.map(lambda x: x[feat]))
+                layer = tf.keras.layers.StringLookup(name=feature)
+                layer.adapt(ds.map(lambda x: x[feat]))
+                self.prep_layers[feature] = layer
+                self.feature_dim[feature] = layer.vocabulary_size()
 
             elif prep == "int":
                 if feat == "hour":
-                    self.prep_layers[feature] = tf.keras.layers.IntegerLookup(vocabulary = np.arange(0, 24, dtype=np.int32), name=feature)
+                    layer = tf.keras.layers.IntegerLookup(vocabulary = np.arange(0, 24, dtype=np.int32), name=feature)
                 elif feat == "day_of_week":
-                    self.prep_layers[feature] = tf.keras.layers.IntegerLookup(vocabulary = np.arange(0, 7, dtype=np.int32), name=feature)
+                    layer = tf.keras.layers.IntegerLookup(vocabulary = np.arange(0, 7, dtype=np.int32), name=feature)
                 else:
-                    self.prep_layers[feature] = tf.keras.layers.IntegerLookup(name=feature).adapt(ds.map(lambda x: x[feat]))
+                    layer = tf.keras.layers.IntegerLookup(name=feature)
+                    layer.adapt(ds.map(lambda x: x[feat]))
+                self.prep_layers[feature] = layer
+                self.feature_dim[feature] = layer.vocabulary_size()
 
             elif prep == "text":
                 text_layer = tf.keras.layers.TextVectorization(
@@ -175,18 +171,25 @@ class Preprocessing(tf.keras.layers.Layer):
                         output_mode="int",
                         output_sequence_length=20,
                         name=f"tv_{feature}"
-                    ).adapt(ds.map(lambda x: x[feat]))
+                    )
+                text_layer.adapt(ds.map(lambda x: x[feat]))
                 self.prep_layers[feature] = tf.keras.Sequential([
                     tf.keras.layers.Lambda(replace_empty_string, name= f"text_null_{feature}"),
                     text_layer
                 ], name=feature)
+                self.feature_dim[feature] = text_layer.vocabulary_size()
 
             elif prep == "disc":
                 # Need to add clip before var name in order to use the clipped features rather than the original ones
-                self.prep_layers[f"disc-clip_{feat}"] = tf.keras.layers.Discretization(num_bins = 100, name=feature).adapt(ds.map(lambda x: x[feat]))
+                layer = tf.keras.layers.Discretization(num_bins = 100, name=feature)
+                layer.adapt(clip_ds.map(lambda x: x[f"clip_{feat}"]))
+                self.prep_layers[f"disc-clip_{feat}"] = layer
+                self.feature_dim[feature] = layer.num_bins
 
             elif prep == "norm":
-                self.prep_layers[f"norm-clip_{feat}"] = tf.keras.layers.Normalization(axis = None, name=feature).adapt(ds.map(lambda x: x[feat]))
+                layer = tf.keras.layers.Normalization(axis = None, name=feature)
+                self.prep_layers[f"norm-clip_{feat}"] = layer
+                layer.adapt(clip_ds.map(lambda x: x[f"clip_{feat}"]))
 
             else:
                 raise ValueError("Preprocessing type not supported.")
@@ -196,16 +199,18 @@ class Preprocessing(tf.keras.layers.Layer):
         if self.extract_time_features:
             input = self.extract_time_features(input)
         # Clip outliers in continuous features if they are present
-        if self.clip_outliers:
+        if self.cont_features:
             input = self.clip_outliers(input)
-        output = {feature: layer(input[feature.split("-")[1]]) for feature, layer in self.prep_layers.items()}
-        return {**input, **output} # Output features will replace input features
+        for feature, layer in self.prep_layers.items():
+            feat = feature.split("-")[1]
+            input[feature] = layer(input[feat])
+        return input # Output features will replace input features
 
     def get_config(self):
         # Method needed for serialization and saving
         config = super().get_config()
         config.update({
-            'features': self.features,
-            # Do not include 'ds' as it is not needed for serialization
+            "features": self.features,
+            # Do not include "ds" as it is not needed for serialization
         })
         return config
