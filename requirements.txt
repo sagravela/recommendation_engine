@@ -3,7 +3,7 @@ tensorflow-recommenders==0.7.3
 tensorflow-probability==0.23.0
 tensorboard
 optuna
-ImbalancedLearningRegressionpandas
+ImbalancedLearningRegression
 numpy
 seaborn
 matplotlib

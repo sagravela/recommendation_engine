@@ -1,6 +1,4 @@
-from pathlib import Path
 import time
-from tkinter import N
 
 import tensorflow as tf
 import pandas as pd

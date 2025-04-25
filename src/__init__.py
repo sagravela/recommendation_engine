@@ -10,7 +10,7 @@ logging.basicConfig(
 log = logging.getLogger("rich")
 
 # Define paths
-ROOT_PATH = Path().resolve().parent
+ROOT_PATH = Path(__file__).resolve().parent.parent
 PROCESSED_PATH = ROOT_PATH / "data" / "processed"
 LOGS_PATH = ROOT_PATH / "output" / "logs_test"
 MODEL_PATH = ROOT_PATH / "output" / "model"
